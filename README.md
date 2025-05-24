@@ -53,8 +53,7 @@ This project follows the [**GitHub Flow**](https://docs.github.com/en/get-starte
 
 4. **Verify code quality and tests**:
    ```bash
-   # Run the verification script that checks formatting, linting, and tests
-   ./scripts/verify.sh
+   ./scripts/precheck-featuremerge.sh
    ```
    
    Only proceed to the next step if all checks pass.
