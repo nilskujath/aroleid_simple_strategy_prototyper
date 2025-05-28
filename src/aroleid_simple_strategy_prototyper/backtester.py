@@ -73,12 +73,64 @@ class StopOrder(OrderBase):
     order_type: OrderType = OrderType.STOP
 
 
+@dataclasses.dataclass(frozen=True)
+class Contract:
+    symbol: str
+    point_value: float
+    tick_size: float
+    broker_commission_per_contract: float
+    exchange_fees_per_contract: float
+    total_fees_per_contract: float = dataclasses.field(init=False)
+
+    def __post_init__(self):
+        object.__setattr__(
+            self,
+            "total_fees_per_contract",
+            self.broker_commission_per_contract + self.exchange_fees_per_contract,
+        )
+
+
 class Backtester(abc.ABC):
 
     def __init__(self):
         self._marketed_data_df = pd.DataFrame()
         self._orders_df = pd.DataFrame()
         self._trades_df = pd.DataFrame()
+
+        self.pending_market_orders: dict[uuid.UUID, MarketOrder] = {}
+        self.pending_limit_orders: dict[uuid.UUID, LimitOrder] = {}
+        self.pending_stop_orders: dict[uuid.UUID, StopOrder] = {}
+
+        self._cash = 100_000
+        self._contract_specifications: Contract | None = None
+
+    def set_initial_cash(self, cash: float) -> None:
+        self._cash = cash
+        logger.info(f"Initial cash set to {self._cash}")
+
+    def set_contract_specifications(
+        self,
+        symbol: str,
+        point_value: float,
+        tick_size: float,
+        broker_commission_per_contract: float,
+        exchange_fees_per_contract: float,
+    ) -> None:
+        contract = Contract(
+            symbol=symbol,
+            point_value=point_value,
+            tick_size=tick_size,
+            broker_commission_per_contract=broker_commission_per_contract,
+            exchange_fees_per_contract=exchange_fees_per_contract,
+        )
+        self._contract_specifications = contract
+        logger.info(
+            f"Contract specifications set for {symbol}: point value={point_value}, "
+            f"tick size={tick_size}, "
+            f"broker commission={broker_commission_per_contract}, "
+            f"exchange fees={exchange_fees_per_contract}, "
+            f"total fees={contract.total_fees_per_contract}."
+        )
 
     def load_historical_market_data(
         self, path_to_dbcsv: str, symbol: str | None = None
@@ -154,4 +206,30 @@ class Backtester(abc.ABC):
 
     @abc.abstractmethod
     def strategy(self, row: pd.Series) -> None:
+        pass
+
+    def submit_order(self, order: OrderBase) -> None:
+        if isinstance(order, MarketOrder):
+            self.pending_market_orders[order.order_id] = order
+            logger.info(f"Submitted market order {order.order_id}")
+        elif isinstance(order, LimitOrder):
+            self.pending_limit_orders[order.order_id] = order
+            logger.info(f"Submitted limit order {order.order_id}")
+        elif isinstance(order, StopOrder):
+            self.pending_stop_orders[order.order_id] = order
+            logger.info(f"Submitted stop order {order.order_id}")
+
+    def run_backtest(self) -> None:
+        self.add_indicators()
+        logger.debug(
+            f"Backtester DataFrame with added Indicators:"
+            f"\n{self._df.head(100).to_string(index=False)}\n"
+            f"...\n{self._df.tail().to_string(index=False)}"
+        )
+        for _, row in self._market_data_df.iterrows():
+            self._process_pending_orders(row)
+            self.strategy(row)
+            logger.debug(f"Processed Bar: {row['ts_event']}")
+
+    def _process_pending_orders(self, row: pd.Series) -> None:
         pass

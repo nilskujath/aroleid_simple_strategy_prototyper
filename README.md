@@ -127,6 +127,35 @@ To convert your existing CSV files to this format, you can use the `convert_csv_
 
 The backtester supports the following Databento OHLCV bar types (the numbers correspond to Databento record type integer IDs): 1-second (32), 1-minute (33), 1-hour (34), 1-day (35). These record types are used when loading historical price data for backtesting. Unconventional record types are labelled as `Unknown (<rtype id>)`, but will not raise an error when attempting to load data.
 
+### Setting Initial Cash and Contract Specifications
+
+After loading historical market data, the backtesting environment will need to be configured by setting the initial cash amount (`set_initial_cash()`) and defining the contract specifications for the instrument that is being traded (`set_contract_specifications()`).
+
+The `set_initial_cash()` method allows to define the starting capital for the backtest:
+```python
+backtester.set_initial_cash(100_000)
+```
+This sets your initial cash balance to 100,000, which is also the default value that is set should this method not be called.
+The Aroleid Simple Strategy Prototyper is designed as a single-instrument backtesting system, so all cash values are assumed to be in the same currency as the OHLC data provided to the system.
+
+
+The `set_contract_specifications()` method defines the key characteristics of the futures contract being traded:
+```python
+backtester.set_contract_specifications(
+    symbol="MNQ",
+    point_value=2.0,
+    tick_size=0.25,
+    broker_commission_per_contract=0.25,
+    exchange_fees_per_contract=0.37,
+    description="Micro E-mini NASDAQ-100"
+)
+```
+Note: The backtester is designed to work with futures contracts in mind.
+Should you wish to trade equities, you will need to define a point value of `1` and a tick size of `0.01` (or `0.0001` for equities trading in penny increments) to reflect the price increments of equities. 
+
+The backtester intentionally omits margin requirements (initial margin, maintenance margin, etc.) from its calculations.
+As a strategy prototyping tool, the focus is on evaluating the performance of trading signals rather than account management constraints.
+The system will report the maximum number of concurrent contracts held during the backtest, which can be used for post-analysis margin calculations, but margin considerations will not inhibit trading decisions during the simulation.
 
 ## Development
 
@@ -136,8 +165,15 @@ Each feature is listed in the order in which it should be implemented, with the 
 Each feature is assigned a number, such as `#03`, and a short name, such as `price-feed`.
 This number and name will be used when creating Git branches (e.g., `feature/03-price-feed`), or writing commit messages, so that the user can easily track what feature each change is related to.
 
+
+**Done**:
 - `#01-Github-workflow-in-README` Add GitHub workflow to README.
 - `#02-csv-to-pandas_df` Read external CSV file in databento format into a pandas DataFrame.
+- `#03-contract-specifications` Define contract specifications.
+
+**Backlog**:
+
+- `#04-order-execution-logic` Implement order execution logic.
 
 
 ### Issue Tracking
@@ -194,7 +230,7 @@ When ready to release a new version:
    poetry version minor  # For new features (0.1.0 -> 0.2.0)
    poetry version major  # For breaking changes (0.1.0 -> 1.0.0)
    ```
-   Then run `git commit -m "Bump version: <old-version> -> <new-version>"` or `git commit --amend`.
+   Then run `git commit -m "Bump version: <old-version> -> <new-version>"` or `git commit --amend` and push to remote.
 
 2. **Build the package**:
    ```bash
