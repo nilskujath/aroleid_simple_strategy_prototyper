@@ -3,12 +3,14 @@ import pandas as pd
 import dataclasses
 import logging
 
-logging.getLogger("aroleid_simple_strategy_prototyper").setLevel(logging.DEBUG)
+logging.getLogger("aroleid_simple_strategy_prototyper").setLevel(logging.INFO)
 
 
 class DummyStrategy(Backtester):
     def add_indicators(self) -> None:
-        pass
+        self._market_data_df["00_sma_100"] = (
+            self._market_data_df["close"].rolling(window=10).mean()
+        )
 
     def strategy(self, row: pd.Series) -> None:
         pass
@@ -22,7 +24,7 @@ if __name__ == "__main__":
     )
 
     backtester.set_initial_cash(100_000)
-    
+
     backtester.set_contract_specifications(
         symbol="MNQ",
         point_value=2.0,
@@ -30,3 +32,5 @@ if __name__ == "__main__":
         broker_commission_per_contract=0.25,
         exchange_fees_per_contract=0.37,
     )
+
+    backtester.run_backtest()

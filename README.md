@@ -1,262 +1,375 @@
 # Aroleid Simple Strategy Prototyper
 
+A Python package for backtesting trading strategies with OHLCV data, designed for rapid strategy prototyping and testing with futures contracts.
 
-A Python package for backtesting trading strategies with OHLCV data.
-
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Development Status](https://img.shields.io/badge/status-pre--alpha-red.svg)](https://pypi.org/project/aroleid-simple-strategy-prototyper/)
 
 ---
-**Table of Contents**
 
-- [Quickstart Guide](#quickstart-guide)
-- [Documentation](#documentation)
-  - [Core Architecture](#core-architecture)
-  - [Flow of Data](#flow-of-data)
-  - [Historical Market Data](#historical-market-data)
+## ⚠️ Legal Disclaimer
+
+**THE INFORMATION PROVIDED IS FOR EDUCATIONAL AND INFORMATIONAL PURPOSES ONLY. IT DOES NOT CONSTITUTE FINANCIAL, INVESTMENT, OR TRADING ADVICE. TRADING INVOLVES SUBSTANTIAL RISK, AND YOU MAY LOSE MORE THAN YOUR INITIAL INVESTMENT.**
+
+**THIS SOFTWARE AND ITS DOCUMENTATION ARE PROVIDED "AS IS," WITHOUT ANY WARRANTIES, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE. THE AUTHORS AND COPYRIGHT HOLDERS ASSUME NO LIABILITY FOR ANY CLAIMS, DAMAGES, OR OTHER LIABILITIES ARISING FROM THE USE OR DISTRIBUTION OF THIS SOFTWARE. USE AT YOUR OWN RISK.**
+
+**Licensed under the GNU General Public License v3.0 (GPL-3.0). See the [LICENSE](LICENSE) for details.**
+
+---
+
+## Table of Contents
+
+- [Quick Start](#quick-start)
+- [Installation](#installation)
+- [Basic Usage](#basic-usage)
+- [Core Concepts](#core-concepts)
+- [Detailed Tutorials](#detailed-tutorials)
 - [Development](#development)
-  - [Feature Roadmap](#feature-roadmap)
-  - [Issue Tracking](#issue-tracking)
-  - [CI/CD Workflow](#cicd-workflow-v010)
-  - [Release Process](#release-process)
 
----
-
-THE INFORMATION PROVIDED IS FOR EDUCATIONAL AND INFORMATIONAL PURPOSES ONLY. IT DOES NOT CONSTITUTE FINANCIAL, INVESTMENT, OR TRADING ADVICE. TRADING INVOLVES SUBSTANTIAL RISK, AND YOU MAY LOSE MORE THAN YOUR INITIAL INVESTMENT.
-
-THIS SOFTWARE AND ITS DOCUMENTATION PAGES (HOSTED ON ONESECONDTRADER.COM) ARE PROVIDED "AS IS," WITHOUT ANY WARRANTIES, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE. THE AUTHORS AND COPYRIGHT HOLDERS ASSUME NO LIABILITY FOR ANY CLAIMS, DAMAGES, OR OTHER LIABILITIES ARISING FROM THE USE OR DISTRIBUTION OF THIS SOFTWARE OR DOCUMENTATION PAGES. USE AT YOUR OWN RISK. ONESECONDTRADER AND ITS DOCUMENTATION PAGES ARE LICENSED UNDER THE GNU GENERAL PUBLIC LICENSE V3.0 (GPL-3.0). SEE THE GPL-3.0 FOR DETAILS.
-
-## Quickstart Guide
-
-### Load Market Data into Pandas DataFrame
-
-If you are using the package in a Google Colab notebook, you can mount your Google Drive to access your CSV files:
+## Quick Start
 
 ```python
+import aroleid_simple_strategy_prototyper as assp
+import pandas as pd
+
+# Define your strategy
+class MyStrategy(assp.Backtester):
+    def add_indicators(self) -> None:
+        # Add a 100-period simple moving average
+        self._market_data_df["00_sma_100"] = (
+            self._market_data_df["close"].rolling(window=100).mean()
+        )
+    
+    def strategy(self, row: pd.Series) -> None:
+        # Strategy logic will be implemented here
+        # (Currently a stub - order execution not yet implemented)
+        pass
+
+# Run backtest
+backtester = MyStrategy()
+backtester.load_historical_market_data("path/to/your/data.csv", symbol="MNQZ4")
+backtester.set_initial_cash(100_000)
+backtester.set_contract_specifications(
+    symbol="MNQ", point_value=2.0, tick_size=0.25,
+    broker_commission_per_contract=0.25, exchange_fees_per_contract=0.37
+)
+backtester.run_backtest()
+```
+
+## Installation
+
+### From PyPI (Recommended)
+
+```bash
+pip install aroleid-simple-strategy-prototyper
+```
+
+### For Google Colab
+
+```python
+!pip install aroleid-simple-strategy-prototyper
+
+# Optional: Mount Google Drive for CSV access
 from google.colab import drive
 drive.mount('/content/drive')
 ```
 
-Install the package from PyPI (using pip or poetry, use `!` in Google Colab before running the pip command in a cell):
-```python
-!pip install aroleid-simple-strategy-prototyper
+### Development Installation
+
+```bash
+git clone https://github.com/nilskujath/aroleid_simple_strategy_prototyper.git
+cd aroleid_simple_strategy_prototyper
+poetry install
 ```
 
-Import the necessary packages:
+## Basic Usage
+
+### 1. Import and Setup Logging
+
 ```python
 import aroleid_simple_strategy_prototyper as assp
 import pandas as pd
-```
-
-If you want to see debug messages, you can set the logging level to DEBUG (default is INFO):
-```python
 import logging
+
+# Optional: Enable debug logging
 logging.getLogger("aroleid_simple_strategy_prototyper").setLevel(logging.DEBUG)
 ```
 
-Subclass the `Backtester` class and implement the two abstract methods (since we just want to use the ``load_historical_market_data()`` method, we can just use `pass` in the body of the methods that need to be implemented):
+### 2. Create Your Strategy Class
+
 ```python
-class DummyStrategy(assp.Backtester):
+class MyStrategy(assp.Backtester):
     def add_indicators(self) -> None:
-        pass
-
-    def strategy(self, row: pd.Series) -> None:
-        pass
-```
-
-After instantiating the `DummyStrategy` class, the `load_historical_market_data()` method can be used to load the historical market data into a pandas DataFrame (adjust path to your CSV file and the optional symbol filter as needed):
-```python
-backtester = DummyStrategy()
-backtester.load_historical_market_data(
-    path_to_dbcsv="/content/drive/MyDrive/csv_port/glbx-mdp3-20241202-20241205.ohlcv-1s.csv",
-    symbol="MNQZ4",
-)
-```
-
-## Documentation
-
-### Core Architecture
-
-The Aroleid Simple Strategy Prototyper is architected around a single abstract base class, `Backtester`, which encapsulates the entire backtesting workflow.
-To implement a custom strategy, users subclass `Backtester` and define the two required abstract methods: `add_indicators()` and `strategy()`.
-This design ensures that users do not need to reimplement the underlying mechanics of the backtesting engine and it enforces a clear separation between infrastructure and strategy logic.
-
-```python
-# ...
-
-class Backtester(abc.ABC):
+        # Define your technical indicators here
+        self._market_data_df["00_sma_20"] = (
+            self._market_data_df["close"].rolling(window=20).mean()
+        )
+        self._market_data_df["01_rsi"] = self._calculate_rsi(period=14)
     
-    # ...
-
-    @abc.abstractmethod
-    def add_indicators(self) -> None:
-        pass
-
-    @abc.abstractmethod
     def strategy(self, row: pd.Series) -> None:
+        # Define your trading logic here
+        # Note: Order execution is not yet implemented
         pass
-
-    # ...
+    
+    def _calculate_rsi(self, period: int = 14) -> pd.Series:
+        """Calculate RSI indicator"""
+        delta = self._market_data_df["close"].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+        rs = gain / loss
+        return 100 - (100 / (1 + rs))
 ```
 
-### Flow of Data
-
-After the `Backtester` class has been subclassed by the user by implementing the two necessary abstract methods, the historical market data can be loaded into a pandas dataframe from a local CSV file (in Databento format, see [Historical Market Data](#historical-market-data)) via the `load_historical_market_data()` method (an optional symbol filter can be applied if necessary).
+### 3. Load Data and Configure
 
 ```python
-# ...
+# Instantiate your strategy
+backtester = MyStrategy()
 
-# Subclass Backtester abstract base class and implement the two abstract methods
-class MyBacktester(Backtester):
-    def add_indicators(self) -> None:
-        # ...
-        
-    def strategy(self, row: pd.Series) -> None:
-        # ...
+# Load historical market data (Databento CSV format)
+backtester.load_historical_market_data(
+    path_to_dbcsv="path/to/your/data.csv",
+    symbol="MNQZ4"  # Optional symbol filter
+)
 
-# Instantiate the Backtester class and load historical market data
-backtester = MyBacktester()
-backtester.load_historical_data("path/to/csv/file.csv")
-```
-
-### Historical Market Data
-
-The Aroleid Simple Strategy Prototyper is designed with compatibility with the [Databento](https://databento.com/) historical market data formats.
-This does not necessarily mean that historical market data needs to be obtained from Databento, but rather that databento's schemas, dataformats, standards, and conventions are observed and data obtained from other sources is converted to the databento format before it is used within ARBE.
-
-The backtester expects historical data to be provided in CSV format with the following columns: `ts_event`, `rtype`, `open`, `high`, `low`, `close`, `volume`, and `symbol`.
-To convert your existing CSV files to this format, you can use the `convert_csv_to_databento_format()` function from `aroleid_simple_strategy_prototyper.helpers`.
-
-The backtester supports the following Databento OHLCV bar types (the numbers correspond to Databento record type integer IDs): 1-second (32), 1-minute (33), 1-hour (34), 1-day (35). These record types are used when loading historical price data for backtesting. Unconventional record types are labelled as `Unknown (<rtype id>)`, but will not raise an error when attempting to load data.
-
-### Setting Initial Cash and Contract Specifications
-
-After loading historical market data, the backtesting environment will need to be configured by setting the initial cash amount (`set_initial_cash()`) and defining the contract specifications for the instrument that is being traded (`set_contract_specifications()`).
-
-The `set_initial_cash()` method allows to define the starting capital for the backtest:
-```python
+# Set initial capital
 backtester.set_initial_cash(100_000)
-```
-This sets your initial cash balance to 100,000, which is also the default value that is set should this method not be called.
-The Aroleid Simple Strategy Prototyper is designed as a single-instrument backtesting system, so all cash values are assumed to be in the same currency as the OHLC data provided to the system.
 
-
-The `set_contract_specifications()` method defines the key characteristics of the futures contract being traded:
-```python
+# Define contract specifications
 backtester.set_contract_specifications(
-    symbol="MNQ",
-    point_value=2.0,
-    tick_size=0.25,
-    broker_commission_per_contract=0.25,
-    exchange_fees_per_contract=0.37,
-    description="Micro E-mini NASDAQ-100"
+    symbol="MNQ",                           # Contract symbol
+    point_value=2.0,                        # Dollar value per point
+    tick_size=0.25,                         # Minimum price increment
+    broker_commission_per_contract=0.25,    # Broker fees per contract
+    exchange_fees_per_contract=0.37         # Exchange fees per contract
 )
 ```
-Note: The backtester is designed to work with futures contracts in mind.
-Should you wish to trade equities, you will need to define a point value of `1` and a tick size of `0.01` (or `0.0001` for equities trading in penny increments) to reflect the price increments of equities. 
 
-The backtester intentionally omits margin requirements (initial margin, maintenance margin, etc.) from its calculations.
-As a strategy prototyping tool, the focus is on evaluating the performance of trading signals rather than account management constraints.
-The system will report the maximum number of concurrent contracts held during the backtest, which can be used for post-analysis margin calculations, but margin considerations will not inhibit trading decisions during the simulation.
+### 4. Run Backtest
+
+```python
+# Execute the backtest
+backtester.run_backtest()
+```
+
+## Core Concepts
+
+### Architecture
+
+The package is built around a single abstract base class `Backtester` that encapsulates the entire backtesting workflow. Users implement custom strategies by subclassing `Backtester` and defining two required methods:
+
+- `add_indicators()`: Calculate technical indicators
+- `strategy()`: Define trading logic (currently a stub)
+
+### Data Flow
+
+1. **Load Data**: Historical OHLCV data in Databento CSV format
+2. **Configure**: Set initial cash and contract specifications  
+3. **Add Indicators**: Calculate technical indicators automatically
+4. **Execute Strategy**: Process each bar through your trading logic
+5. **Generate Results**: Analyze performance metrics
+
+### Supported Data Formats
+
+The backtester expects CSV data in [Databento](https://databento.com/) format with columns:
+- `ts_event`: Timestamp (nanoseconds)
+- `rtype`: Record type (32=1s, 33=1m, 34=1h, 35=1d bars)
+- `open`, `high`, `low`, `close`: OHLC prices (scaled by 1e9)
+- `volume`: Trading volume
+- `symbol`: Instrument symbol
+
+### Indicator Naming Convention
+
+Indicators must follow a specific naming pattern for chart plotting:
+
+```python
+# Format: "<2-digit-number>_<indicator_name>"
+self._market_data_df["00_sma_50"] = ...    # Plots on price chart
+self._market_data_df["01_rsi"] = ...       # Plots in subplot 1
+self._market_data_df["01_rsi_ma"] = ...    # Also plots in subplot 1
+self._market_data_df["02_macd"] = ...      # Plots in subplot 2
+```
+
+- `00_*`: Overlays on the main price chart
+- `01_*`, `02_*`, etc.: Groups indicators in separate subplots
+
+## Detailed Tutorials
+
+### Working with Market Data
+
+#### Loading Data
+
+```python
+# Basic loading
+backtester.load_historical_market_data("data.csv")
+
+# With symbol filtering
+backtester.load_historical_market_data("data.csv", symbol="MNQZ4")
+```
+
+#### Data Conversion
+
+If your data isn't in Databento format, use the conversion helper:
+
+```python
+from aroleid_simple_strategy_prototyper.helpers import convert_csv_to_databento_format
+
+# Convert your CSV to Databento format
+convert_csv_to_databento_format("input.csv", "output_databento.csv")
+```
+
+### Contract Configuration
+
+#### Futures Contracts
+
+```python
+# Micro E-mini NASDAQ-100
+backtester.set_contract_specifications(
+    symbol="MNQ", point_value=2.0, tick_size=0.25,
+    broker_commission_per_contract=0.25, exchange_fees_per_contract=0.37
+)
+
+# E-mini S&P 500
+backtester.set_contract_specifications(
+    symbol="ES", point_value=50.0, tick_size=0.25,
+    broker_commission_per_contract=0.50, exchange_fees_per_contract=1.20
+)
+```
+
+#### Equity Simulation
+
+```python
+# For equity backtesting, use point_value=1 and appropriate tick_size
+backtester.set_contract_specifications(
+    symbol="AAPL", point_value=1.0, tick_size=0.01,
+    broker_commission_per_contract=0.005, exchange_fees_per_contract=0.0
+)
+```
+
+### Advanced Indicator Examples
+
+#### Multiple Moving Averages
+
+```python
+def add_indicators(self) -> None:
+    close = self._market_data_df["close"]
+    
+    # Multiple SMAs on price chart
+    self._market_data_df["00_sma_20"] = close.rolling(20).mean()
+    self._market_data_df["00_sma_50"] = close.rolling(50).mean()
+    self._market_data_df["00_sma_200"] = close.rolling(200).mean()
+    
+    # Bollinger Bands
+    sma_20 = close.rolling(20).mean()
+    std_20 = close.rolling(20).std()
+    self._market_data_df["00_bb_upper"] = sma_20 + (2 * std_20)
+    self._market_data_df["00_bb_lower"] = sma_20 - (2 * std_20)
+```
+
+#### Momentum Indicators
+
+```python
+def add_indicators(self) -> None:
+    # RSI in subplot 1
+    self._market_data_df["01_rsi"] = self._calculate_rsi(14)
+    self._market_data_df["01_rsi_ma"] = (
+        self._market_data_df["01_rsi"].rolling(5).mean()
+    )
+    
+    # MACD in subplot 2
+    ema_12 = self._market_data_df["close"].ewm(span=12).mean()
+    ema_26 = self._market_data_df["close"].ewm(span=26).mean()
+    self._market_data_df["02_macd"] = ema_12 - ema_26
+    self._market_data_df["02_macd_signal"] = (
+        self._market_data_df["02_macd"].ewm(span=9).mean()
+    )
+```
+
+## Development Status
+
+### Current Features ✅
+
+- ✅ Historical data loading (Databento CSV format)
+- ✅ Contract specifications and fee modeling
+- ✅ Technical indicator framework
+- ✅ Backtesting infrastructure
+- ✅ Logging and debugging support
+
+### In Development 🚧
+
+- 🚧 **Order execution logic** - Currently a stub in `strategy()` method
+- 🚧 **Position management** - Order processing and trade execution
+- 🚧 **Performance analytics** - P&L calculation and metrics
+- 🚧 **Chart plotting** - Visualization of results and indicators
+
+### Planned Features 📋
+
+- 📋 Multiple timeframe support
+- 📋 Portfolio backtesting
+- 📋 Risk management tools
+- 📋 Strategy optimization
+
+> **Note**: The `strategy()` method is currently a stub. Order execution and position management are not yet implemented. The package currently supports data loading, indicator calculation, and backtesting infrastructure setup.
 
 ## Development
 
 ### Feature Roadmap
 
-Each feature is listed in the order in which it should be implemented, with the most significant features listed first.
-Each feature is assigned a number, such as `#03`, and a short name, such as `price-feed`.
-This number and name will be used when creating Git branches (e.g., `feature/03-price-feed`), or writing commit messages, so that the user can easily track what feature each change is related to.
+Features are tracked with numbered identifiers for Git workflow:
 
+**Completed**:
+- `#01-Github-workflow-in-README` ✅ GitHub workflow documentation
+- `#02-csv-to-pandas_df` ✅ CSV data loading functionality  
+- `#03-contract-specifications` ✅ Contract specification system
 
-**Done**:
-- `#01-Github-workflow-in-README` Add GitHub workflow to README.
-- `#02-csv-to-pandas_df` Read external CSV file in databento format into a pandas DataFrame.
-- `#03-contract-specifications` Define contract specifications.
+**In Progress**:
+- `#04-order-execution-logic` 🚧 Order execution and position management
 
-**Backlog**:
+### GitHub Flow Workflow
 
-- `#04-order-execution-logic` Implement order execution logic.
+This project follows [GitHub Flow](https://docs.github.com/en/get-started/using-github/github-flow) for development:
 
+```bash
+# 1. Create feature branch
+git checkout master
+git pull origin master
+git checkout -b feature/#04-order-execution-logic
 
-### Issue Tracking
+# 2. Make changes and commit
+git add .
+git commit -m "Feature #04: Add market order execution"
 
-Each issue is documented and addressed in the order of importance or urgency.
-Like features, issues are assigned a number and a short name, such as `#i05-fix-timestamp-format`, prepended with `i` to indicate that it is an issue and not a feature.
-This identifier will be used in Git branches (e.g., `fix/i05-fix-timestamp-format`), commit messages, or pull request titles to make it easy to trace which changes resolve which issues.
+# 3. Verify code quality
+./scripts/precheck-featuremerge.sh
 
+# 4. Merge to master
+git checkout master
+git merge feature/#04-order-execution-logic
+git push origin master
 
-### CI/CD Workflow (v0.1.0)
-
-This project follows a simplified [**GitHub Flow**](https://docs.github.com/en/get-started/using-github/github-flow) for solo development:
-
-1. **Create a feature branch** from `master`:
-   ```bash
-   git checkout master
-   git pull origin master
-   git checkout -b feature/#<feature-number>-<feature-short-name>
-   ```
-
-2. **Make changes and commit** regularly:
-   ```bash
-   git add .
-   git commit -m "Feature #<feature-number>: <commit-message>"
-   ```
-
-3. **Verify code quality**:
-   ```bash
-   ./scripts/precheck-featuremerge.sh
-   ```
-   
-4. **Merge to master** when feature is complete:
-   ```bash
-   git checkout master
-   git pull origin master
-   git merge feature/#<feature-number>-<feature-short-name>
-   git push origin master
-   ```
-
-5. **Cleanup**:
-   ```bash
-   git branch -d feature/#<feature-number>-<feature-short-name>
-   ```
-
-For bug fixes, use the same workflow but with branch naming `fix/i<issue-number>-<issue-short-name>` and commit message `Fix #<issue-number>: <commit-message>`.
+# 5. Cleanup
+git branch -d feature/#04-order-execution-logic
+```
 
 ### Release Process
 
-When ready to release a new version:
+```bash
+# Update version
+poetry version patch  # or minor/major
 
-1. **Update version number** in `pyproject.toml`:
-   ```bash
-   poetry version patch  # For bug fixes (0.1.0 -> 0.1.1)
-   poetry version minor  # For new features (0.1.0 -> 0.2.0)
-   poetry version major  # For breaking changes (0.1.0 -> 1.0.0)
-   ```
-   Then run `git commit -m "Bump version: <old-version> -> <new-version>"` or `git commit --amend` and push to remote.
+# Build and test
+poetry build
+pip install dist/*.whl
 
-2. **Build the package**:
-   ```bash
-   poetry build
-   ```
+# Create release
+git tag -a v$(poetry version -s) -m "Release v$(poetry version -s)"
+git push origin v$(poetry version -s)
 
-3. **Test the package locally**:
-   ```bash
-   pip install dist/*.whl
-   ```
+# Publish
+poetry publish
+```
 
-4. **Upload to TestPyPI** (optional):
-   ```bash
-   poetry config repositories.testpypi https://test.pypi.org/legacy/
-   poetry publish -r testpypi
-   ```
+---
 
-5. **Create a Git tag** for the release:
-   ```bash
-   git tag -a v$(poetry version -s) -m "Release v$(poetry version -s)"
-   git push origin v$(poetry version -s)
-   ```
-
-6. **Publish to PyPI**:
-   ```bash
-   poetry publish
-   ```
-
-7. **Create a GitHub Release** with release notes.
+**Happy backtesting! 📈**

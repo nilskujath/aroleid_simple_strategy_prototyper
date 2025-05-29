@@ -106,7 +106,7 @@ class Backtester(abc.ABC):
 
     def set_initial_cash(self, cash: float) -> None:
         self._cash = cash
-        logger.info(f"Initial cash set to {self._cash}")
+        logger.debug(f"Initial cash set to {self._cash}")
 
     def set_contract_specifications(
         self,
@@ -124,7 +124,7 @@ class Backtester(abc.ABC):
             exchange_fees_per_contract=exchange_fees_per_contract,
         )
         self._contract_specifications = contract
-        logger.info(
+        logger.debug(
             f"Contract specifications set for {symbol}: point value={point_value}, "
             f"tick size={tick_size}, "
             f"broker commission={broker_commission_per_contract}, "
@@ -136,7 +136,7 @@ class Backtester(abc.ABC):
         self, path_to_dbcsv: str, symbol: str | None = None
     ) -> None:
         try:
-            logger.info(f"Reading CSV file: {path_to_dbcsv}...")
+            logger.debug(f"Reading CSV file: {path_to_dbcsv}...")
             self._market_data_df = pd.read_csv(
                 path_to_dbcsv,
                 usecols=[
@@ -162,12 +162,12 @@ class Backtester(abc.ABC):
             )
 
             if symbol is not None:
-                logger.info(f"Filtering data for symbol {symbol}...")
+                logger.debug(f"Filtering data for symbol {symbol}...")
                 self._market_data_df = self._market_data_df[
                     self._market_data_df["symbol"] == symbol
                 ]
 
-            logger.info(
+            logger.debug(
                 "Converting timestamps and price values to human-readable formats..."
             )
             self._market_data_df["ts_event"] = pd.to_datetime(
@@ -211,20 +211,27 @@ class Backtester(abc.ABC):
     def submit_order(self, order: OrderBase) -> None:
         if isinstance(order, MarketOrder):
             self.pending_market_orders[order.order_id] = order
-            logger.info(f"Submitted market order {order.order_id}")
+            logger.debug(f"Submitted market order {order.order_id}")
         elif isinstance(order, LimitOrder):
             self.pending_limit_orders[order.order_id] = order
-            logger.info(f"Submitted limit order {order.order_id}")
+            logger.debug(f"Submitted limit order {order.order_id}")
         elif isinstance(order, StopOrder):
             self.pending_stop_orders[order.order_id] = order
-            logger.info(f"Submitted stop order {order.order_id}")
+            logger.debug(f"Submitted stop order {order.order_id}")
 
     def run_backtest(self) -> None:
+        if self._contract_specifications is None:
+            raise ValueError(
+                "Contract specifications must be set before running "
+                "backtest. Call set_contract_specifications() first."
+            )
+
         self.add_indicators()
+        logger.info(f"Loading indicators...")
         logger.debug(
             f"Backtester DataFrame with added Indicators:"
-            f"\n{self._df.head(100).to_string(index=False)}\n"
-            f"...\n{self._df.tail().to_string(index=False)}"
+            f"\n{self._market_data_df.head(100).to_string(index=False)}\n"
+            f"...\n{self._market_data_df.tail().to_string(index=False)}"
         )
         for _, row in self._market_data_df.iterrows():
             self._process_pending_orders(row)
